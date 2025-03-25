@@ -151,65 +151,43 @@ struct COORD findWhereToGo(struct COORD _c) {
 // _s 부터 _d 까지 경로 출력(메인)
 
 int findPath(struct COORD _s, struct COORD _d) {
+    struct COORD current = _s;
+    addToVisited(current);
 
-   // 현재 위치를 설정
-   struct COORD current = _s;
+    while (1) {
+        struct COORD whereToGo = findWhereToGo(current);
 
-   // 출발 좌표를 저장
-   addToVisited(current);
+        if (whereToGo.row != -1 && whereToGo.col != -1) {
+            push(current);
+            current = whereToGo;
+            addToVisited(current);
 
-   while (1) {
-      // 현재 위치에서 가는 곳을 찾는다.
-      struct COORD whereToGo = findWhereToGo(current);
-
-      if ((whereToGo.row != -1) && (whereToGo.col != -1)) {
-         // 갈 곳이 있음
-         push(current); // 경로를 저장해둔다.
-         current = whereToGo;   // current는 항상 현재 위치를 나타내는 역할
-         addToVisited(current); // 내가 여기 왔다고 표시,,,
-         if (checkDestination(current, _d) == 1) {
-            // 끝...도착했음
-            // stack에 들어있는 경로를 모두 출력
-
-            // 이 부분은 출력이므로 이따가 필요하면 쓸게요
-            // for (int i = 0; i <= top; i++){
-            //    printf("(%d, %d)\n", path_stack[i].row, path_stack[i].col);
-            // }
-            // printf("목적지 도착했음. (%d, %d)\n", current.row, current.col);
-            return 1;
-         }
-      }
-      else {
-
-         while(1){
-            //top_coord <= stack의 맨 위에 있는 곳을 peek (pop아님)
-            struct COORD top_coord = peek();
-
-            // top_coord (-1,-1) : 스택이 비었음. 돌아갈 곳이 없음
-            if ((top_coord.row == -1) && (top_coord.col == -1)){
-               return 0;
+            if (checkDestination(current, _d)) {
+                push(current);  // 도착 지점도 경로에 포함
+                return 1;
             }
-            whereToGo = findWhereToGo(top_coord);
-         
-            if ((whereToGo.row == -1) && (whereToGo.col == -1)){
-               // findwheretogo(top_coord) ==> (-1,-1)
-               // 이 좌표 (top_coord)는 도움이 안됨.. 더 이전으로 돌아가야 함. 이 좌표는 버림(pop)
-               pop(); // top_coord를 날려버림
-            }
+        } else {
+            while (1) {
+                struct COORD top_coord = peek();
 
-            else {
-               // findwheretogo(top_coord) ==> 유효한 좌표가 나옴
-               // current = wheretogo
-               // push가 필요 없음.. 왜냐면 top_coord가 아직 스택에 있기 때문
-               // addtovisited(current)
-               current = whereToGo;
-               addToVisited(current);
-               break;
+                if (top_coord.row == -1 && top_coord.col == -1) {
+                    return 0;  // 더 이상 갈 곳 없음
+                }
+
+                whereToGo = findWhereToGo(top_coord);
+
+                if (whereToGo.row == -1 && whereToGo.col == -1) {
+                    pop();  // 막다른 길
+                } else {
+                    current = whereToGo;
+                    addToVisited(current);
+                    break;
+                }
             }
-         }
-      }
-   }
+        }
+    }
 }
+
 
 // _s 부터 _d 까지 경로 출력(메인)
 //////////////////////////////////////////////////////////////////
@@ -225,77 +203,64 @@ int main() {
         return 1;
     }
 
+    // 미로 메모리 할당 및 초기화
     maze = (int**)malloc(SZ * sizeof(int*));
     for (int i = 0; i < SZ; i++) {
         maze[i] = (int*)malloc(SZ * sizeof(int));
-    }
-
-    for (int i = 0; i < SZ; i++) {
         for (int j = 0; j < SZ; j++) {
             maze[i][j] = 0;
         }
     }
 
     struct COORD start_point = { 0, 0 };
-    struct COORD dest_point = { SZ-1, SZ-1 };
+    struct COORD dest_point = { SZ - 1, SZ - 1 };
 
     srand(time(NULL));
+
     int totalCells = SZ * SZ;
     int raw = totalCells * 70;
     int wallTarget = raw / 100;
     if (raw % 100 != 0) wallTarget++;
 
     int wallCount = 0;
+    int max_attempts = 1000;
+    int attempts = 0;
 
-    // 경로가 사라지지 않게 벽 추가
-    while (wallCount < wallTarget) {
+    while (wallCount < wallTarget && attempts < max_attempts) {
         int r = rand() % SZ;
         int c = rand() % SZ;
 
-        if ((r == 0 && c == 0) || (r == SZ-1 && c == SZ-1)) continue;
+        if ((r == 0 && c == 0) || (r == SZ - 1 && c == SZ - 1)) continue;
         if (maze[r][c] == 1) continue;
 
         maze[r][c] = 1;
+
         top = -1;
         visitedindex = -1;
+        for (int i = 0; i < 900; i++) {
+            visited[i].row = -1;
+            visited[i].col = -1;
+        }
 
         if (findPath(start_point, dest_point)) {
             wallCount++;
+            attempts = 0;
         } else {
             maze[r][c] = 0;
+            attempts++;
         }
-
-        // 모든 공간을 시도해봤는데 더 이상 추가할 수 없을 경우 대비
-        int possible = 0;
-        for (int i = 0; i < SZ; i++) {
-            for (int j = 0; j < SZ; j++) {
-                if ((i == 0 && j == 0) || (i == SZ-1 && j == SZ-1)) continue;
-                if (maze[i][j] == 0) {
-                    maze[i][j] = 1;
-                    top = -1;
-                    visitedindex = -1;
-                    if (findPath(start_point, dest_point)) {
-                        possible = 1;
-                    }
-                    maze[i][j] = 0;
-                    if (possible) break;
-                }
-            }
-            if (possible) break;
-        }
-        if (!possible) break; // 더 이상 벽을 추가할 수 없음
     }
 
-    // 남은 벽 강제로 채우기
-    while (wallCount < wallTarget) {
-        int r = rand() % SZ;
-        int c = rand() % SZ;
-        if ((r == 0 && c == 0) || (r == SZ-1 && c == SZ-1)) continue;
-        if (maze[r][c] == 1) continue;
-        maze[r][c] = 1;
-        wallCount++;
+    // 최종 경로 다시 계산해서 path_stack에 저장
+    top = -1;
+    visitedindex = -1;
+    for (int i = 0; i < 900; i++) {
+        visited[i].row = -1;
+        visited[i].col = -1;
     }
+    findPath(start_point, dest_point);
 
+    // 미로 출력
     printf("\n생성된 미로 (0: 길, 1: 벽):\n");
     for (int i = 0; i < SZ; i++) {
         for (int j = 0; j < SZ; j++) {
@@ -304,15 +269,25 @@ int main() {
         printf("\n");
     }
 
-    // 마지막 경로 존재 여부 검사
-    top = -1;
-    visitedindex = -1;
-    if (findPath(start_point, dest_point)) {
-        printf("\n이 미로는 유효합니다. 경로가 존재합니다.\n");
+    // 통계 출력
+    printf("\n미로 크기: %d x %d\n", SZ, SZ);
+    printf("벽 개수: %d개 (%.2f%%)\n", wallCount, (100.0 * wallCount) / (SZ * SZ));
+
+    if ((100.0 * wallCount) / (SZ * SZ) < 70.0) {
+        printf("충분한 벽이 생성되지 않은은 미로입니다.\n");
     } else {
-        printf("\n경고 : 이 미로는 경로가 존재하지 않습니다.\n");
+        printf("벽이 70%%넘게 생성된 유효한 미로입니다.\n");
     }
 
+    // 경로 출력
+    printf("\n탈출 경로: ");
+    for (int i = 0; i <= top; i++) {
+        printf("(%d,%d)", path_stack[i].row, path_stack[i].col);
+        if (i != top) printf(" -> ");
+    }
+    printf("\n");
+
+    // 메모리 해제
     for (int i = 0; i < SZ; i++) {
         free(maze[i]);
     }
